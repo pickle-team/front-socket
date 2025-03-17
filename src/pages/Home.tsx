@@ -3,10 +3,12 @@ import Login from "../components/Login";
 import SignUp from "../components/SignUp";
 import ChatBox from "../components/ChatBox";
 import { useState, useEffect } from "react";
+import NewChat from "../components/NewChat";
 
 export default function Home() {
   const [login, setLogin] = useState(false);
   const [username, setUsername] = useState("");
+  const [rooms, setRooms] = useState([]);
 
   const getCookie = (name: string) => {
     const cookieValue = document.cookie
@@ -17,11 +19,35 @@ export default function Home() {
     return cookieValue || "";
   };
 
+  const fetchRooms = async (username: string) => {
+    try {
+      const response = await fetch(`/api/room/get?username=${username}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (response.ok) {
+        const rooms = await response.json();
+        console.log("Fetched rooms:", rooms);
+        setRooms(rooms);
+      } else {
+        console.error("Failed to fetch rooms:", response.status);
+      }
+    } catch (error) {
+      console.error("Error fetching rooms:", error);
+    }
+    return [];
+  };
+
   useEffect(() => {
     const usernameFromCookie = getCookie("username");
     if (usernameFromCookie) {
       setUsername(usernameFromCookie);
       setLogin(true);
+
+      fetchRooms(usernameFromCookie);
     } else {
       setLogin(false);
     }
@@ -41,10 +67,16 @@ export default function Home() {
         <Box height="16px" />
         <Text>안녕하세요 {username}님</Text>
         <Box height="16px" />
-        <ChatBox id="1" />
-        <ChatBox id="2" />
-        <ChatBox id="3" />
       </Flex>
+
+      <Flex width="300px" direction={"column"} align="center" justify="center">
+        {rooms.map((room: { id: number; members: string[] }) => (
+          <ChatBox key={room.id} id={room.id} />
+        ))}
+      </Flex>
+
+      <NewChat />
+      <Box height="16px" />
       <Button color="red" onClick={handleLogout}>
         LogOut
       </Button>

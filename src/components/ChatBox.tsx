@@ -1,7 +1,7 @@
 import { Box, Text } from "@radix-ui/themes";
 import { Link } from "react-router";
 
-export default function ChatBox({ id }: { id: string }) {
+export default function ChatBox({ id }: { id: number }) {
   return (
     <Link style={{ width: "100%" }} to={`/chat/${id}`}>
       <Box width="100%">
