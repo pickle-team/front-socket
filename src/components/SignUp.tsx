@@ -12,10 +12,12 @@ export default function SignUp() {
       formData.append("username", username);
       formData.append("password", password);
 
-      const response = await fetch("http://localhost:8080/member/register", {
+      const response = await fetch("/api/member/register", {
         method: "POST",
         body: formData,
       });
+
+      console.log(response);
 
       if (response.ok) {
         alert("Registration successful!");
