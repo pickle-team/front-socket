@@ -1,12 +1,22 @@
 import { Box, Button, Flex, Heading, Text, TextArea } from "@radix-ui/themes";
 import { useParams } from "react-router";
 import { useEffect, useState } from "react";
+import WebSocketService from "../services/WebSocketService";
+
+interface ChatMessage {
+  id: number;
+  username: string;
+  content: string;
+  room: number;
+  timestamp: string;
+}
 
 export default function Chat() {
   const { id } = useParams();
   const [content, setContent] = useState("");
   const [username, setUsername] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [connected, setConnected] = useState(false);
 
   const getCookie = (name: string) => {
     const cookieValue = document.cookie
@@ -38,53 +48,65 @@ export default function Chat() {
     }
   };
 
+  // WebSocket 연결 및 구독 설정
+  const setupWebSocket = async () => {
+    try {
+      // WebSocket 연결
+      await WebSocketService.connect();
+      setConnected(true);
+
+      // 채팅방 토픽 구독
+      WebSocketService.subscribe(
+        `/topic/chat.${id}`,
+        (message: ChatMessage) => {
+          setMessages((prevMessages) => [message, ...prevMessages]);
+        }
+      );
+    } catch (error) {
+      console.error("WebSocket 연결 실패:", error);
+    }
+  };
+
   useEffect(() => {
     const usernameFromCookie = getCookie("username");
     if (usernameFromCookie) {
       setUsername(usernameFromCookie);
     }
 
+    // 초기 메시지 로드
     fetchMessages();
+
+    // WebSocket 설정
+    setupWebSocket();
+
+    // 컴포넌트 언마운트 시 WebSocket 연결 해제
+    return () => {
+      WebSocketService.disconnect();
+    };
   }, [id]);
 
   const handleSendMessage = async () => {
-    if (!content.trim()) {
+    if (!username || !content.trim()) {
       return;
     }
 
-    try {
-      const username = getCookie("username");
-
-      if (!username) {
-        alert("You must be logged in to send messages");
-        return;
-      }
-
-      const time = new Date().toISOString();
-
-      const response = await fetch("/api/chat/post", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          room: id,
-          username,
-          content,
-          timestamp: time,
-        }),
-      });
-
-      if (response.ok) {
-        setContent("");
-        fetchMessages();
-      } else {
-        alert("Failed to send message");
-      }
-    } catch (error) {
-      console.error("Error sending message:", error);
-      alert("An error occurred while sending your message");
+    if (!connected) {
+      alert("서버에 연결되지 않았습니다. 페이지를 새로고침해 주세요.");
+      return;
     }
+
+    const chatMessage = {
+      username,
+      content,
+      room: Number(id),
+      timestamp: new Date().toISOString(),
+    };
+
+    // WebSocket을 통해 메시지 전송
+    WebSocketService.send("/app/chat.sendMessage", chatMessage);
+
+    // 입력 필드 초기화
+    setContent("");
   };
 
   return (
@@ -106,36 +128,26 @@ export default function Chat() {
           }}
         >
           {messages.length > 0 ? (
-            messages.map(
-              (
-                msg: {
-                  username: string;
-                  content: string;
-                  room: number;
-                  id: number;
-                },
-                index
-              ) => (
-                <Box
-                  key={index}
-                  style={{
-                    marginBottom: "8px",
-                    alignSelf:
-                      msg.username === username ? "flex-end" : "flex-start",
-                    backgroundColor:
-                      msg.username === username ? "#e3f2fd" : "#f5f5f5",
-                    padding: "8px 12px",
-                    borderRadius: "12px",
-                    maxWidth: "80%",
-                  }}
-                >
-                  <Text size="2" weight="bold">
-                    {msg.username + " "}
-                  </Text>
-                  <Text>{msg.content}</Text>
-                </Box>
-              )
-            )
+            messages.map((msg, index) => (
+              <Box
+                key={index}
+                style={{
+                  marginBottom: "8px",
+                  alignSelf:
+                    msg.username === username ? "flex-end" : "flex-start",
+                  backgroundColor:
+                    msg.username === username ? "#e3f2fd" : "#f5f5f5",
+                  padding: "8px 12px",
+                  borderRadius: "12px",
+                  maxWidth: "80%",
+                }}
+              >
+                <Text size="2" weight="bold">
+                  {msg.username + " "}
+                </Text>
+                <Text>{msg.content}</Text>
+              </Box>
+            ))
           ) : (
             <Text>No messages yet</Text>
           )}
@@ -146,6 +158,12 @@ export default function Chat() {
           placeholder="메세지를 입력하세요."
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSendMessage();
+            }
+          }}
         />
         <Box height="16px" />
         <Button
