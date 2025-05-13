@@ -48,14 +48,11 @@ export default function Chat() {
     }
   };
 
-  // WebSocket 연결 및 구독 설정
   const setupWebSocket = async () => {
     try {
-      // WebSocket 연결
       await WebSocketService.connect();
       setConnected(true);
 
-      // 채팅방 토픽 구독
       WebSocketService.subscribe(
         `/topic/chat.${id}`,
         (message: ChatMessage) => {
@@ -73,13 +70,10 @@ export default function Chat() {
       setUsername(usernameFromCookie);
     }
 
-    // 초기 메시지 로드
     fetchMessages();
 
-    // WebSocket 설정
     setupWebSocket();
 
-    // 컴포넌트 언마운트 시 WebSocket 연결 해제
     return () => {
       WebSocketService.disconnect();
     };
@@ -102,10 +96,8 @@ export default function Chat() {
       timestamp: new Date().toISOString(),
     };
 
-    // WebSocket을 통해 메시지 전송
     WebSocketService.send("/app/chat.sendMessage", chatMessage);
 
-    // 입력 필드 초기화
     setContent("");
   };
 

@@ -87,5 +87,4 @@ class WebSocketService {
   }
 }
 
-// 싱글톤 인스턴스 생성
 export default new WebSocketService();
